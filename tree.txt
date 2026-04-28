@@ -1,0 +1,11 @@
+data-sentinel/
+├── app/                # FastAPI entry point
+├── core/               # Base classes and Logic
+│   ├── base_provider.py
+│   └── validator.py
+├── providers/          # Specific implementations
+│   ├── rest_provider.py
+│   └── graphql_provider.py
+├── schemas/            # Pydantic models (Auto-generated)
+├── tests/              # Unit & Integration tests
+└── config.yaml         # API Registry & Credentials
