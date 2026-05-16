@@ -1,0 +1,432 @@
+"""
+Auto-generated API tests for {{ api_schema.title }}.
+
+Generated: {{ generation_timestamp }}
+API Version: {{ api_schema.version }}
+
+This test suite uses pytest and polyfactory to test all API endpoints.
+"""
+
+import pytest
+from typing import Any, Dict
+from polyfactory.factories.pydantic_factory import ModelFactory
+
+from models import {{ model_names|join(', ') }}
+from validators import APIValidator
+
+
+# Pydantic model factories for generating test data
+{% for model_name in model_names %}
+class {{ model_name }}Factory(ModelFactory[{{ model_name }}]):
+    """Factory for generating {{ model_name }} test instances."""
+    __model__ = {{ model_name }}
+
+{% endfor %}
+
+@pytest.fixture
+def api_base_url():
+    """Base URL for API tests."""
+    return "{{ api_schema.base_url }}"
+
+
+@pytest.fixture
+async def api_validator(api_base_url):
+    """Create API validator instance."""
+    async with APIValidator(
+        base_url=api_base_url,
+        timeout=30.0,
+        max_retries=3,
+    ) as validator:
+        yield validator
+
+
+@pytest.fixture
+def mock_response_data():
+    """Generate mock response data for testing."""
+    return {
+        {% for model_name in model_names %}
+        "{{ model_name }}": {{ model_name }}Factory.build().model_dump(),
+        {% endfor %}
+    }
+
+{% for endpoint in api_schema.endpoints %}
+# Tests for {{ endpoint.method }} {{ endpoint.path }}
+
+@pytest.mark.asyncio
+async def test_{{ endpoint.get_function_name() }}_success(api_validator, httpx_mock):
+    """
+    Test successful {{ endpoint.method }} {{ endpoint.path }}.
+    
+    {{ endpoint.description or 'No description' }}
+    """
+    # Arrange: Create mock response data
+    {% if _get_response_model(endpoint) %}
+    mock_data = {{ _get_response_model_name(endpoint) }}Factory.build()
+    {% else %}
+    mock_data = {"status": "success"}
+    {% endif %}
+    
+    # Mock the HTTP response
+    httpx_mock.add_response(
+        method="{{ endpoint.method }}",
+        url="{{ api_schema.base_url }}{{ endpoint.path }}",
+        json=mock_data.model_dump() if hasattr(mock_data, 'model_dump') else mock_data,
+        status_code=200,
+    )
+    
+    # Act: Call the validator
+    {% if endpoint.parameters %}
+    result = await api_validator.validate_{{ endpoint.get_function_name() }}(
+        {% for param in endpoint.parameters %}
+        {% if param.location == 'path' %}
+        {{ param.name }}={{ _get_mock_param_value(param) }},
+        {% elif param.location == 'query' and param.required %}
+        {{ param.name }}={{ _get_mock_param_value(param) }},
+        {% endif %}
+        {% endfor %}
+    )
+    {% else %}
+    result = await api_validator.validate_{{ endpoint.get_function_name() }}()
+    {% endif %}
+    
+    # Assert: Verify the result
+    {% if _get_response_model(endpoint) %}
+    assert isinstance(result, {{ _get_response_model_name(endpoint) }})
+    {% else %}
+    assert result is not None
+    {% endif %}
+
+
+@pytest.mark.asyncio
+async def test_{{ endpoint.get_function_name() }}_validation_error(api_validator, httpx_mock):
+    """
+    Test {{ endpoint.method }} {{ endpoint.path }} with invalid response data.
+    
+    Should raise ValidationException when response doesn't match schema.
+    """
+    from core.exceptions import ValidationException
+    
+    # Arrange: Create invalid response data
+    invalid_data = {"invalid": "data", "missing": "required_fields"}
+    
+    # Mock the HTTP response with invalid data
+    httpx_mock.add_response(
+        method="{{ endpoint.method }}",
+        url="{{ api_schema.base_url }}{{ endpoint.path }}",
+        json=invalid_data,
+        status_code=200,
+    )
+    
+    # Act & Assert: Should raise ValidationException
+    with pytest.raises(ValidationException):
+        {% if endpoint.parameters %}
+        await api_validator.validate_{{ endpoint.get_function_name() }}(
+            {% for param in endpoint.parameters %}
+            {% if param.location == 'path' %}
+            {{ param.name }}={{ _get_mock_param_value(param) }},
+            {% elif param.location == 'query' and param.required %}
+            {{ param.name }}={{ _get_mock_param_value(param) }},
+            {% endif %}
+            {% endfor %}
+        )
+        {% else %}
+        await api_validator.validate_{{ endpoint.get_function_name() }}()
+        {% endif %}
+
+
+@pytest.mark.asyncio
+async def test_{{ endpoint.get_function_name() }}_http_error(api_validator, httpx_mock):
+    """
+    Test {{ endpoint.method }} {{ endpoint.path }} with HTTP error.
+    
+    Should raise APIException when HTTP request fails.
+    """
+    from core.exceptions import APIException
+    
+    # Mock HTTP error response
+    httpx_mock.add_response(
+        method="{{ endpoint.method }}",
+        url="{{ api_schema.base_url }}{{ endpoint.path }}",
+        status_code=404,
+        json={"error": "Not found"},
+    )
+    
+    # Act & Assert: Should raise APIException
+    with pytest.raises(APIException):
+        {% if endpoint.parameters %}
+        await api_validator.validate_{{ endpoint.get_function_name() }}(
+            {% for param in endpoint.parameters %}
+            {% if param.location == 'path' %}
+            {{ param.name }}={{ _get_mock_param_value(param) }},
+            {% elif param.location == 'query' and param.required %}
+            {{ param.name }}={{ _get_mock_param_value(param) }},
+            {% endif %}
+            {% endfor %}
+        )
+        {% else %}
+        await api_validator.validate_{{ endpoint.get_function_name() }}()
+        {% endif %}
+
+
+@pytest.mark.asyncio
+async def test_{{ endpoint.get_function_name() }}_schema_drift(api_validator, httpx_mock):
+    """
+    Test {{ endpoint.method }} {{ endpoint.path }} with schema drift.
+    
+    Should detect when response has extra or missing fields.
+    """
+    # Arrange: Create response with extra fields
+    {% if _get_response_model(endpoint) %}
+    mock_data = {{ _get_response_model_name(endpoint) }}Factory.build()
+    response_data = mock_data.model_dump()
+    response_data["extra_field"] = "unexpected"
+    {% else %}
+    response_data = {"status": "success", "extra_field": "unexpected"}
+    {% endif %}
+    
+    # Mock the HTTP response
+    httpx_mock.add_response(
+        method="{{ endpoint.method }}",
+        url="{{ api_schema.base_url }}{{ endpoint.path }}",
+        json=response_data,
+        status_code=200,
+    )
+    
+    # Act: Call the validator (should log warning but not fail)
+    {% if endpoint.parameters %}
+    result = await api_validator.validate_{{ endpoint.get_function_name() }}(
+        {% for param in endpoint.parameters %}
+        {% if param.location == 'path' %}
+        {{ param.name }}={{ _get_mock_param_value(param) }},
+        {% elif param.location == 'query' and param.required %}
+        {{ param.name }}={{ _get_mock_param_value(param) }},
+        {% endif %}
+        {% endfor %}
+    )
+    {% else %}
+    result = await api_validator.validate_{{ endpoint.get_function_name() }}()
+    {% endif %}
+    
+    # Assert: Should still return valid result despite drift
+    {% if _get_response_model(endpoint) %}
+    assert isinstance(result, {{ _get_response_model_name(endpoint) }})
+    {% else %}
+    assert result is not None
+    {% endif %}
+
+{% if endpoint.parameters %}
+
+@pytest.mark.asyncio
+async def test_{{ endpoint.get_function_name() }}_with_parameters(api_validator, httpx_mock):
+    """
+    Test {{ endpoint.method }} {{ endpoint.path }} with various parameter combinations.
+    """
+    # Arrange: Create mock response
+    {% if _get_response_model(endpoint) %}
+    mock_data = {{ _get_response_model_name(endpoint) }}Factory.build()
+    {% else %}
+    mock_data = {"status": "success"}
+    {% endif %}
+    
+    # Mock the HTTP response
+    httpx_mock.add_response(
+        method="{{ endpoint.method }}",
+        url="{{ api_schema.base_url }}{{ endpoint.path }}",
+        json=mock_data.model_dump() if hasattr(mock_data, 'model_dump') else mock_data,
+        status_code=200,
+    )
+    
+    # Act: Test with different parameter values
+    result = await api_validator.validate_{{ endpoint.get_function_name() }}(
+        {% for param in endpoint.parameters %}
+        {{ param.name }}={{ _get_mock_param_value(param) }},
+        {% endfor %}
+    )
+    
+    # Assert
+    {% if _get_response_model(endpoint) %}
+    assert isinstance(result, {{ _get_response_model_name(endpoint) }})
+    {% else %}
+    assert result is not None
+    {% endif %}
+{% endif %}
+
+{% endfor %}
+
+# Integration tests
+
+@pytest.mark.asyncio
+async def test_api_validator_context_manager(api_base_url):
+    """Test APIValidator as async context manager."""
+    async with APIValidator(base_url=api_base_url) as validator:
+        assert validator._client is not None
+    
+    # Client should be closed after context exit
+    # Note: We can't directly test this without accessing private attributes
+
+
+@pytest.mark.asyncio
+async def test_api_validator_caching(api_base_url, httpx_mock):
+    """Test response caching functionality."""
+    # Arrange: Create mock response
+    {% if model_names %}
+    mock_data = {{ model_names[0] }}Factory.build()
+    {% else %}
+    mock_data = {"status": "success"}
+    {% endif %}
+    
+    httpx_mock.add_response(
+        method="GET",
+        url=f"{api_base_url}{{ api_schema.endpoints[0].path if api_schema.endpoints else '/test' }}",
+        json=mock_data.model_dump() if hasattr(mock_data, 'model_dump') else mock_data,
+        status_code=200,
+    )
+    
+    # Act: Make two requests with caching enabled
+    async with APIValidator(base_url=api_base_url, enable_cache=True) as validator:
+        {% if api_schema.endpoints %}
+        {% set first_endpoint = api_schema.endpoints[0] %}
+        result1 = await validator.validate_{{ first_endpoint.get_function_name() }}(
+            {% for param in first_endpoint.parameters %}
+            {% if param.location == 'path' %}
+            {{ param.name }}={{ _get_mock_param_value(param) }},
+            {% endif %}
+            {% endfor %}
+        )
+        result2 = await validator.validate_{{ first_endpoint.get_function_name() }}(
+            {% for param in first_endpoint.parameters %}
+            {% if param.location == 'path' %}
+            {{ param.name }}={{ _get_mock_param_value(param) }},
+            {% endif %}
+            {% endfor %}
+        )
+        
+        # Assert: Both results should be identical (from cache)
+        assert result1 == result2
+        {% endif %}
+
+
+@pytest.mark.asyncio
+async def test_validation_report():
+    """Test ValidationReport functionality."""
+    from validators import ValidationReport
+    
+    report = ValidationReport()
+    
+    # Add some results
+    report.add_result("/users", True)
+    report.add_result("/posts", False, error="Validation failed")
+    report.add_result("/comments", True, drift={"extra": ["field1"]})
+    
+    # Get summary
+    summary = report.get_summary()
+    assert summary["total"] == 3
+    assert summary["successful"] == 2
+    assert summary["failed"] == 1
+    assert summary["drift_detected"] == 1
+    assert summary["success_rate"] == pytest.approx(66.67, rel=0.01)
+    
+    # Get failed endpoints
+    failed = report.get_failed_endpoints()
+    assert len(failed) == 1
+    assert failed[0]["endpoint"] == "/posts"
+    
+    # Get drift endpoints
+    drift = report.get_drift_endpoints()
+    assert len(drift) == 1
+    assert drift[0]["endpoint"] == "/comments"
+
+
+# Performance tests
+
+@pytest.mark.asyncio
+@pytest.mark.slow
+async def test_concurrent_requests(api_base_url, httpx_mock):
+    """Test handling multiple concurrent requests."""
+    import asyncio
+    
+    # Arrange: Mock multiple responses
+    {% if model_names %}
+    mock_data = {{ model_names[0] }}Factory.build()
+    {% else %}
+    mock_data = {"status": "success"}
+    {% endif %}
+    
+    for _ in range(10):
+        httpx_mock.add_response(
+            method="GET",
+            url=f"{api_base_url}{{ api_schema.endpoints[0].path if api_schema.endpoints else '/test' }}",
+            json=mock_data.model_dump() if hasattr(mock_data, 'model_dump') else mock_data,
+            status_code=200,
+        )
+    
+    # Act: Make concurrent requests
+    async with APIValidator(base_url=api_base_url) as validator:
+        {% if api_schema.endpoints %}
+        {% set first_endpoint = api_schema.endpoints[0] %}
+        tasks = [
+            validator.validate_{{ first_endpoint.get_function_name() }}(
+                {% for param in first_endpoint.parameters %}
+                {% if param.location == 'path' %}
+                {{ param.name }}={{ _get_mock_param_value(param) }},
+                {% endif %}
+                {% endfor %}
+            )
+            for _ in range(10)
+        ]
+        results = await asyncio.gather(*tasks)
+        
+        # Assert: All requests should succeed
+        assert len(results) == 10
+        {% endif %}
+
+
+# Edge case tests
+
+@pytest.mark.asyncio
+async def test_empty_response(api_validator, httpx_mock):
+    """Test handling of empty response."""
+    httpx_mock.add_response(
+        method="GET",
+        url="{{ api_schema.base_url }}{{ api_schema.endpoints[0].path if api_schema.endpoints else '/test' }}",
+        json={},
+        status_code=200,
+    )
+    
+    {% if api_schema.endpoints %}
+    {% set first_endpoint = api_schema.endpoints[0] %}
+    # Should handle empty response gracefully
+    with pytest.raises(Exception):  # Could be ValidationException or other
+        await api_validator.validate_{{ first_endpoint.get_function_name() }}(
+            {% for param in first_endpoint.parameters %}
+            {% if param.location == 'path' %}
+            {{ param.name }}={{ _get_mock_param_value(param) }},
+            {% endif %}
+            {% endfor %}
+        )
+    {% endif %}
+
+
+@pytest.mark.asyncio
+async def test_malformed_json(api_validator, httpx_mock):
+    """Test handling of malformed JSON response."""
+    httpx_mock.add_response(
+        method="GET",
+        url="{{ api_schema.base_url }}{{ api_schema.endpoints[0].path if api_schema.endpoints else '/test' }}",
+        content=b"not valid json",
+        status_code=200,
+    )
+    
+    {% if api_schema.endpoints %}
+    {% set first_endpoint = api_schema.endpoints[0] %}
+    from core.exceptions import ValidationException
+    
+    with pytest.raises(ValidationException):
+        await api_validator.validate_{{ first_endpoint.get_function_name() }}(
+            {% for param in first_endpoint.parameters %}
+            {% if param.location == 'path' %}
+            {{ param.name }}={{ _get_mock_param_value(param) }},
+            {% endif %}
+            {% endfor %}
+        )
+    {% endif %}

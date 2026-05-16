@@ -1,0 +1,333 @@
+# {{ api_schema.title }} - Data Dictionary
+
+**Version:** {{ api_schema.version }}  
+**Base URL:** {{ api_schema.base_url }}  
+**Generated:** {{ generation_timestamp }}
+
+{% if api_schema.description %}
+## Description
+
+{{ api_schema.description }}
+{% endif %}
+
+---
+
+## Table of Contents
+
+- [Overview](#overview)
+- [Data Models](#data-models)
+{% for model_name in model_names %}
+  - [{{ model_name }}](#{{ model_name|lower }})
+{% endfor %}
+- [API Endpoints](#api-endpoints)
+{% for endpoint in api_schema.endpoints %}
+  - [{{ endpoint.method }} {{ endpoint.path }}](#{{ _get_endpoint_anchor(endpoint) }})
+{% endfor %}
+{% if api_schema.auth_config %}
+- [Authentication](#authentication)
+{% endif %}
+
+---
+
+## Overview
+
+This document provides a comprehensive data dictionary for the {{ api_schema.title }} API. It includes detailed information about all data models, fields, validation rules, and API endpoints.
+
+### Statistics
+
+- **Total Models:** {{ api_schema.models|length }}
+- **Total Endpoints:** {{ api_schema.endpoints|length }}
+- **Total Fields:** {{ _count_total_fields() }}
+
+---
+
+## Data Models
+
+{% for model_name in model_names %}
+{% set model = api_schema.models[model_name] %}
+### {{ model.name }}
+
+{% if model.description %}
+**Description:** {{ model.description }}
+{% endif %}
+
+**Fields:** {{ model.fields|length }}
+
+| Field Name | Type | Required | Description | Constraints | Example |
+|------------|------|----------|-------------|-------------|---------|
+{% for field in model.fields %}
+| `{{ field.name }}` | {{ _get_field_type_display(field) }} | {{ '✓' if field.required else '✗' }} | {{ field.description or 'N/A' }} | {{ _get_field_constraints(field) }} | {{ _get_field_example(field) }} |
+{% endfor %}
+
+{% if model.example %}
+**Example:**
+
+```json
+{{ model.example|tojson(indent=2) }}
+```
+{% endif %}
+
+---
+
+{% endfor %}
+
+## API Endpoints
+
+{% for endpoint in api_schema.endpoints %}
+### {{ endpoint.method }} {{ endpoint.path }}
+
+{% if endpoint.summary %}
+**Summary:** {{ endpoint.summary }}
+{% endif %}
+
+{% if endpoint.description %}
+**Description:** {{ endpoint.description }}
+{% endif %}
+
+**Method:** `{{ endpoint.method }}`  
+**Path:** `{{ endpoint.path }}`  
+{% if endpoint.operation_id %}
+**Operation ID:** `{{ endpoint.operation_id }}`  
+{% endif %}
+{% if endpoint.tags %}
+**Tags:** {{ endpoint.tags|join(', ') }}  
+{% endif %}
+**Authentication Required:** {{ 'Yes' if endpoint.auth_required else 'No' }}  
+{% if endpoint.deprecated %}
+**⚠️ Deprecated:** This endpoint is deprecated and may be removed in future versions.
+{% endif %}
+
+{% if endpoint.parameters %}
+#### Parameters
+
+| Name | Location | Type | Required | Description | Constraints |
+|------|----------|------|----------|-------------|-------------|
+{% for param in endpoint.parameters %}
+| `{{ param.name }}` | {{ param.location }} | {{ _get_param_type_display(param) }} | {{ '✓' if param.required else '✗' }} | {{ param.description or 'N/A' }} | {{ _get_param_constraints(param) }} |
+{% endfor %}
+{% endif %}
+
+{% if endpoint.request_model %}
+#### Request Body
+
+**Model:** [`{{ endpoint.request_model.name }}`](#{{ endpoint.request_model.name|lower }})
+
+{% if endpoint.request_model.example %}
+**Example:**
+
+```json
+{{ endpoint.request_model.example|tojson(indent=2) }}
+```
+{% endif %}
+{% endif %}
+
+#### Response
+
+**Model:** [`{{ endpoint.response_model.name }}`](#{{ endpoint.response_model.name|lower }})
+
+{% if endpoint.response_model.example %}
+**Example:**
+
+```json
+{{ endpoint.response_model.example|tojson(indent=2) }}
+```
+{% endif %}
+
+#### Example Request
+
+```bash
+curl -X {{ endpoint.method }} \
+  "{{ api_schema.base_url }}{{ endpoint.path }}" \
+{% if endpoint.auth_required and api_schema.auth_config %}
+  -H "{{ _get_auth_header(api_schema.auth_config) }}" \
+{% endif %}
+{% if endpoint.method in ['POST', 'PUT', 'PATCH'] %}
+  -H "Content-Type: application/json" \
+  -d '{{ _get_example_request_body(endpoint)|tojson }}'
+{% endif %}
+```
+
+---
+
+{% endfor %}
+
+{% if api_schema.auth_config %}
+## Authentication
+
+**Type:** {{ api_schema.auth_config.type }}
+
+{% if api_schema.auth_config.type == 'api_key' %}
+**Location:** {{ api_schema.auth_config.location }}  
+**Parameter Name:** {{ api_schema.auth_config.name }}
+
+API key should be provided in the {{ api_schema.auth_config.location }} as `{{ api_schema.auth_config.name }}`.
+
+**Example:**
+
+```bash
+curl -X GET "{{ api_schema.base_url }}/endpoint" \
+  {% if api_schema.auth_config.location == 'header' %}
+  -H "{{ api_schema.auth_config.name }}: YOUR_API_KEY"
+  {% else %}
+  "?{{ api_schema.auth_config.name }}=YOUR_API_KEY"
+  {% endif %}
+```
+
+{% elif api_schema.auth_config.type == 'bearer' %}
+**Scheme:** {{ api_schema.auth_config.scheme or 'Bearer' }}
+
+Bearer token should be provided in the Authorization header.
+
+**Example:**
+
+```bash
+curl -X GET "{{ api_schema.base_url }}/endpoint" \
+  -H "Authorization: Bearer YOUR_TOKEN"
+```
+
+{% elif api_schema.auth_config.type == 'oauth2' %}
+**Token URL:** {{ api_schema.auth_config.token_url }}  
+{% if api_schema.auth_config.authorization_url %}
+**Authorization URL:** {{ api_schema.auth_config.authorization_url }}  
+{% endif %}
+
+{% if api_schema.auth_config.scopes %}
+**Scopes:**
+
+{% for scope, description in api_schema.auth_config.scopes.items() %}
+- `{{ scope }}`: {{ description }}
+{% endfor %}
+{% endif %}
+
+OAuth2 authentication requires obtaining an access token from the authorization server.
+
+{% endif %}
+
+---
+
+{% endif %}
+
+## Field Type Reference
+
+| Type | Description | Python Type | Validation |
+|------|-------------|-------------|------------|
+| `string` | Text string | `str` | Length, pattern |
+| `integer` | Whole number | `int` | Min/max value |
+| `float` | Decimal number | `float` | Min/max value |
+| `boolean` | True/False value | `bool` | N/A |
+| `array` | List of items | `list` | Min/max items |
+| `object` | Nested object | `dict` | Additional properties |
+| `date` | Date (YYYY-MM-DD) | `date` | Format |
+| `datetime` | Date and time (ISO 8601) | `datetime` | Format |
+| `uuid` | UUID string | `UUID` | Format |
+| `email` | Email address | `EmailStr` | Format |
+| `url` | URL string | `HttpUrl` | Format |
+
+---
+
+## Validation Rules
+
+### String Validation
+
+- **min_length**: Minimum string length
+- **max_length**: Maximum string length
+- **pattern**: Regular expression pattern
+
+### Numeric Validation
+
+- **min_value** (ge): Minimum value (greater than or equal)
+- **max_value** (le): Maximum value (less than or equal)
+- **multiple_of**: Value must be a multiple of this number
+
+### Array Validation
+
+- **min_items**: Minimum number of items
+- **max_items**: Maximum number of items
+- **unique_items**: Whether items must be unique
+
+### Enum Validation
+
+- **enum_values**: List of allowed values
+
+---
+
+## Error Responses
+
+All endpoints may return the following error responses:
+
+### 400 Bad Request
+
+Invalid request parameters or body.
+
+```json
+{
+  "error": "Bad Request",
+  "message": "Invalid parameter value",
+  "details": {}
+}
+```
+
+### 401 Unauthorized
+
+Authentication required or failed.
+
+```json
+{
+  "error": "Unauthorized",
+  "message": "Authentication required"
+}
+```
+
+### 404 Not Found
+
+Resource not found.
+
+```json
+{
+  "error": "Not Found",
+  "message": "Resource not found"
+}
+```
+
+### 422 Unprocessable Entity
+
+Validation failed.
+
+```json
+{
+  "error": "Validation failed",
+  "message": "Response validation failed: 2 errors",
+  "details": [
+    {
+      "loc": ["field_name"],
+      "msg": "field required",
+      "type": "value_error.missing"
+    }
+  ]
+}
+```
+
+### 500 Internal Server Error
+
+Server error.
+
+```json
+{
+  "error": "Internal Server Error",
+  "message": "An unexpected error occurred"
+}
+```
+
+---
+
+## Changelog
+
+### Version {{ api_schema.version }}
+
+- Initial data dictionary generation
+- {{ api_schema.models|length }} models documented
+- {{ api_schema.endpoints|length }} endpoints documented
+
+---
+
+**Generated by DataSentinel** | {{ generation_timestamp }}

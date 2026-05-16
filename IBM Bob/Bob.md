@@ -1,4 +1,4 @@
-You are acting as a senior Python architect and. I need you to create a complete 
+You are acting as a senior Python architect and Data Engineer Senior. I need you to create a complete 
 architectural plan for a tool called Data Sentinel.
 
 ## What Data Sentinel does
