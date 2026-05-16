@@ -66,14 +66,18 @@ class AppGenerator:
     def _get_response_model_name(self, endpoint: Endpoint) -> str:
         """
         Get the response model name for an endpoint.
-        
+
+        Falls back to Any when the endpoint references a model that
+        the parser didn't materialize in api_schema.models, so the
+        generated FastAPI routes don't reference undefined names.
+
         Args:
             endpoint: Endpoint schema
-        
+
         Returns:
             Model class name or "Any" if no model
         """
-        if endpoint.response_model:
+        if endpoint.response_model and endpoint.response_model.name in self.api_schema.models:
             return endpoint.response_model.name
         return "Any"
     

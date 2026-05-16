@@ -1,7 +1,7 @@
 """
 Auto-generated FastAPI application for Query API.
 
-Generated: 2026-05-16T15:20:09.486938Z
+Generated: 2026-05-16T20:57:58.384593Z
 API Version: 1.0.0
 
 This FastAPI app exposes the API validators as REST endpoints.
@@ -19,7 +19,7 @@ from loguru import logger
 
 from models import Query, Character, Location, Episode, FilterCharacter, Characters, Info, FilterLocation, FilterEpisode
 from validators import APIValidator, ValidationReport
-from core.exceptions import ValidationException, APIException, SchemaException
+from exceptions import ValidationException, APIException, SchemaException
 
 
 # Request/Response models for the validation service
@@ -736,7 +736,7 @@ async def validate_location(
 
 @app.post(
     "/validate/query/locations",
-    response_model=Locations,
+    response_model=Any,
     tags=["Endpoints"],
 )
 async def validate_locations(
@@ -865,7 +865,7 @@ async def validate_episode(
 
 @app.post(
     "/validate/query/episodes",
-    response_model=Episodes,
+    response_model=Any,
     tags=["Endpoints"],
 )
 async def validate_episodes(

@@ -121,9 +121,14 @@ class ModelsGenerator:
         
         # Handle object type
         elif field.type == FieldType.OBJECT:
-            if field.nested_model:
+            if field.nested_model and field.nested_model in self.api_schema.models:
                 base_type = field.nested_model
             else:
+                if field.nested_model:
+                    logger.warning(
+                        f"Field '{field.name}' references unknown model "
+                        f"'{field.nested_model}'; falling back to dict[str, Any]"
+                    )
                 base_type = "dict[str, Any]"
         
         # Handle scalar types

@@ -1,7 +1,7 @@
 """
 Auto-generated API tests for Query API.
 
-Generated: 2026-05-16T15:20:09.480264Z
+Generated: 2026-05-16T20:57:58.377674Z
 API Version: 1.0.0
 
 This test suite uses pytest and polyfactory to test all API endpoints.
@@ -121,7 +121,7 @@ async def test_character_validation_error(api_validator, httpx_mock):
     
     Should raise ValidationException when response doesn't match schema.
     """
-    from core.exceptions import ValidationException
+    from exceptions import ValidationException
     
     # Arrange: Create invalid response data
     invalid_data = {"invalid": "data", "missing": "required_fields"}
@@ -148,7 +148,7 @@ async def test_character_http_error(api_validator, httpx_mock):
     
     Should raise APIException when HTTP request fails.
     """
-    from core.exceptions import APIException
+    from exceptions import APIException
     
     # Mock HTTP error response
     httpx_mock.add_response(
@@ -253,7 +253,7 @@ async def test_characters_validation_error(api_validator, httpx_mock):
     
     Should raise ValidationException when response doesn't match schema.
     """
-    from core.exceptions import ValidationException
+    from exceptions import ValidationException
     
     # Arrange: Create invalid response data
     invalid_data = {"invalid": "data", "missing": "required_fields"}
@@ -279,7 +279,7 @@ async def test_characters_http_error(api_validator, httpx_mock):
     
     Should raise APIException when HTTP request fails.
     """
-    from core.exceptions import APIException
+    from exceptions import APIException
     
     # Mock HTTP error response
     httpx_mock.add_response(
@@ -384,7 +384,7 @@ async def test_characters_by_ids_validation_error(api_validator, httpx_mock):
     
     Should raise ValidationException when response doesn't match schema.
     """
-    from core.exceptions import ValidationException
+    from exceptions import ValidationException
     
     # Arrange: Create invalid response data
     invalid_data = {"invalid": "data", "missing": "required_fields"}
@@ -411,7 +411,7 @@ async def test_characters_by_ids_http_error(api_validator, httpx_mock):
     
     Should raise APIException when HTTP request fails.
     """
-    from core.exceptions import APIException
+    from exceptions import APIException
     
     # Mock HTTP error response
     httpx_mock.add_response(
@@ -517,7 +517,7 @@ async def test_location_validation_error(api_validator, httpx_mock):
     
     Should raise ValidationException when response doesn't match schema.
     """
-    from core.exceptions import ValidationException
+    from exceptions import ValidationException
     
     # Arrange: Create invalid response data
     invalid_data = {"invalid": "data", "missing": "required_fields"}
@@ -544,7 +544,7 @@ async def test_location_http_error(api_validator, httpx_mock):
     
     Should raise APIException when HTTP request fails.
     """
-    from core.exceptions import APIException
+    from exceptions import APIException
     
     # Mock HTTP error response
     httpx_mock.add_response(
@@ -649,7 +649,7 @@ async def test_locations_validation_error(api_validator, httpx_mock):
     
     Should raise ValidationException when response doesn't match schema.
     """
-    from core.exceptions import ValidationException
+    from exceptions import ValidationException
     
     # Arrange: Create invalid response data
     invalid_data = {"invalid": "data", "missing": "required_fields"}
@@ -675,7 +675,7 @@ async def test_locations_http_error(api_validator, httpx_mock):
     
     Should raise APIException when HTTP request fails.
     """
-    from core.exceptions import APIException
+    from exceptions import APIException
     
     # Mock HTTP error response
     httpx_mock.add_response(
@@ -780,7 +780,7 @@ async def test_locations_by_ids_validation_error(api_validator, httpx_mock):
     
     Should raise ValidationException when response doesn't match schema.
     """
-    from core.exceptions import ValidationException
+    from exceptions import ValidationException
     
     # Arrange: Create invalid response data
     invalid_data = {"invalid": "data", "missing": "required_fields"}
@@ -807,7 +807,7 @@ async def test_locations_by_ids_http_error(api_validator, httpx_mock):
     
     Should raise APIException when HTTP request fails.
     """
-    from core.exceptions import APIException
+    from exceptions import APIException
     
     # Mock HTTP error response
     httpx_mock.add_response(
@@ -913,7 +913,7 @@ async def test_episode_validation_error(api_validator, httpx_mock):
     
     Should raise ValidationException when response doesn't match schema.
     """
-    from core.exceptions import ValidationException
+    from exceptions import ValidationException
     
     # Arrange: Create invalid response data
     invalid_data = {"invalid": "data", "missing": "required_fields"}
@@ -940,7 +940,7 @@ async def test_episode_http_error(api_validator, httpx_mock):
     
     Should raise APIException when HTTP request fails.
     """
-    from core.exceptions import APIException
+    from exceptions import APIException
     
     # Mock HTTP error response
     httpx_mock.add_response(
@@ -1045,7 +1045,7 @@ async def test_episodes_validation_error(api_validator, httpx_mock):
     
     Should raise ValidationException when response doesn't match schema.
     """
-    from core.exceptions import ValidationException
+    from exceptions import ValidationException
     
     # Arrange: Create invalid response data
     invalid_data = {"invalid": "data", "missing": "required_fields"}
@@ -1071,7 +1071,7 @@ async def test_episodes_http_error(api_validator, httpx_mock):
     
     Should raise APIException when HTTP request fails.
     """
-    from core.exceptions import APIException
+    from exceptions import APIException
     
     # Mock HTTP error response
     httpx_mock.add_response(
@@ -1176,7 +1176,7 @@ async def test_episodes_by_ids_validation_error(api_validator, httpx_mock):
     
     Should raise ValidationException when response doesn't match schema.
     """
-    from core.exceptions import ValidationException
+    from exceptions import ValidationException
     
     # Arrange: Create invalid response data
     invalid_data = {"invalid": "data", "missing": "required_fields"}
@@ -1203,7 +1203,7 @@ async def test_episodes_by_ids_http_error(api_validator, httpx_mock):
     
     Should raise APIException when HTTP request fails.
     """
-    from core.exceptions import APIException
+    from exceptions import APIException
     
     # Mock HTTP error response
     httpx_mock.add_response(
@@ -1401,7 +1401,7 @@ async def test_malformed_json(api_validator, httpx_mock):
         status_code=200,
     )
     
-    from core.exceptions import ValidationException
+    from exceptions import ValidationException
     
     with pytest.raises(ValidationException):
         await api_validator.validate_character(

@@ -1,7 +1,7 @@
 """
 Auto-generated API validators for Query API.
 
-Generated: 2026-05-16T15:20:09.460077Z
+Generated: 2026-05-16T20:57:58.360903Z
 API Version: 1.0.0
 """
 
@@ -11,12 +11,12 @@ from loguru import logger
 from pydantic import ValidationError
 
 from models import Query, Character, Location, Episode, FilterCharacter, Characters, Info, FilterLocation, FilterEpisode
-from core.exceptions import (
+from exceptions import (
     ValidationException,
     APIException,
     SchemaException,
 )
-from core.retry_handler import with_retry
+from retry_handler import with_retry
 
 
 class APIValidator:
@@ -461,7 +461,7 @@ class APIValidator:
         self,
         page: Optional[int] = None,
         filter: Optional[str] = None,
-    ) -> Locations:
+    ) -> Any:
         """
         Validate GET /query/locations.
         
@@ -472,7 +472,7 @@ class APIValidator:
             filter: No description
         
         Returns:
-            Validated Locations instance
+            Validated Any instance
         
         Raises:
             ValidationException: If response validation fails
@@ -511,18 +511,10 @@ class APIValidator:
             raise ValidationException(f"Invalid JSON response: {str(e)}")
         
         # Detect schema drift
-        expected_fields = set(Locations.model_fields.keys())
-        actual_fields = set(data.keys()) if isinstance(data, dict) else set()
-        drift = self._detect_schema_drift(expected_fields, actual_fields)
-        
-        if drift:
-            logger.warning(f"Schema drift detected for /query/locations: {drift}")
-            # Optionally raise exception for strict validation
-            # raise SchemaException(f"Schema drift: {drift}")
         
         # Validate response
         try:
-            validated = Locations.model_validate(data)
+            validated = data  # No model defined, return raw data
             
             # Update cache
             self._update_cache(cache_key, validated)
@@ -693,7 +685,7 @@ class APIValidator:
         self,
         page: Optional[int] = None,
         filter: Optional[str] = None,
-    ) -> Episodes:
+    ) -> Any:
         """
         Validate GET /query/episodes.
         
@@ -704,7 +696,7 @@ class APIValidator:
             filter: No description
         
         Returns:
-            Validated Episodes instance
+            Validated Any instance
         
         Raises:
             ValidationException: If response validation fails
@@ -743,18 +735,10 @@ class APIValidator:
             raise ValidationException(f"Invalid JSON response: {str(e)}")
         
         # Detect schema drift
-        expected_fields = set(Episodes.model_fields.keys())
-        actual_fields = set(data.keys()) if isinstance(data, dict) else set()
-        drift = self._detect_schema_drift(expected_fields, actual_fields)
-        
-        if drift:
-            logger.warning(f"Schema drift detected for /query/episodes: {drift}")
-            # Optionally raise exception for strict validation
-            # raise SchemaException(f"Schema drift: {drift}")
         
         # Validate response
         try:
-            validated = Episodes.model_validate(data)
+            validated = data  # No model defined, return raw data
             
             # Update cache
             self._update_cache(cache_key, validated)

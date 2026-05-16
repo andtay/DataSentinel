@@ -8,6 +8,8 @@ API Version: {{ api_schema.version }}
 Generated: {{ generation_timestamp }}
 """
 
+from __future__ import annotations
+
 from datetime import date, datetime
 from typing import Any, List, Optional
 from uuid import UUID
@@ -90,6 +92,11 @@ class {{ model.name }}(BaseModel):
     }
 
 
+{% endfor %}
+
+# Resolve forward references (enabled by `from __future__ import annotations`)
+{% for model_name, model in api_schema.models.items() %}
+{{ model.name }}.model_rebuild()
 {% endfor %}
 
 # Made with DataSentinel

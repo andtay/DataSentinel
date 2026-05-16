@@ -19,7 +19,7 @@ from loguru import logger
 
 from models import {{ model_names|join(', ') }}
 from validators import APIValidator, ValidationReport
-from core.exceptions import ValidationException, APIException, SchemaException
+from exceptions import ValidationException, APIException, SchemaException
 
 
 # Request/Response models for the validation service

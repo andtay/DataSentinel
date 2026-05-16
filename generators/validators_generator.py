@@ -102,31 +102,36 @@ class ValidatorsGenerator:
     def _get_response_model_name(self, endpoint: Endpoint) -> str:
         """
         Get the response model name for an endpoint.
-        
+
+        Falls back to Any when the endpoint's response_model isn't a
+        real model in api_schema.models (e.g. references to types the
+        parser didn't materialize).
+
         Args:
             endpoint: Endpoint schema
-        
+
         Returns:
             Model class name or "Any" if no model
         """
-        if endpoint.response_model:
-            # response_model is a ModelSchema object
+        if endpoint.response_model and endpoint.response_model.name in self.api_schema.models:
             return endpoint.response_model.name
-        
-        # Default to Any if no model found
         return "Any"
-    
+
     def _get_response_model(self, endpoint: Endpoint) -> Optional[str]:
         """
         Get the response model for an endpoint (for validation).
-        
+
+        Returns None when the endpoint references a model that isn't in
+        api_schema.models, so the template skips schema-drift validation
+        instead of emitting an undefined name.
+
         Args:
             endpoint: Endpoint schema
-        
+
         Returns:
             Model name or None
         """
-        if endpoint.response_model:
+        if endpoint.response_model and endpoint.response_model.name in self.api_schema.models:
             return endpoint.response_model.name
         return None
     

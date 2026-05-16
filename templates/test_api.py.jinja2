@@ -104,7 +104,7 @@ async def test_{{ endpoint.get_function_name() }}_validation_error(api_validator
     
     Should raise ValidationException when response doesn't match schema.
     """
-    from core.exceptions import ValidationException
+    from exceptions import ValidationException
     
     # Arrange: Create invalid response data
     invalid_data = {"invalid": "data", "missing": "required_fields"}
@@ -141,7 +141,7 @@ async def test_{{ endpoint.get_function_name() }}_http_error(api_validator, http
     
     Should raise APIException when HTTP request fails.
     """
-    from core.exceptions import APIException
+    from exceptions import APIException
     
     # Mock HTTP error response
     httpx_mock.add_response(
@@ -419,7 +419,7 @@ async def test_malformed_json(api_validator, httpx_mock):
     
     {% if api_schema.endpoints %}
     {% set first_endpoint = api_schema.endpoints[0] %}
-    from core.exceptions import ValidationException
+    from exceptions import ValidationException
     
     with pytest.raises(ValidationException):
         await api_validator.validate_{{ first_endpoint.get_function_name() }}(

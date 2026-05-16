@@ -2,7 +2,7 @@
 # Generated: {{ generation_timestamp }}
 
 # Stage 1: Builder
-FROM python:3.11-slim as builder
+FROM python:3.11-slim AS builder
 
 LABEL maintainer="DataSentinel"
 LABEL description="{{ api_schema.title }} - API Validation Service"
@@ -36,13 +36,12 @@ RUN groupadd -r appuser && useradd -r -g appuser appuser
 COPY --from=builder /usr/local/lib/python3.11/site-packages /usr/local/lib/python3.11/site-packages
 COPY --from=builder /usr/local/bin /usr/local/bin
 
-# Copy application code
+# Copy application code (the generated app is self-contained)
 COPY models.py .
 COPY validators.py .
 COPY app.py .
-COPY core/ ./core/
-COPY config/ ./config/
-COPY schemas/ ./schemas/
+COPY exceptions.py .
+COPY retry_handler.py .
 
 # Set ownership
 RUN chown -R appuser:appuser /app

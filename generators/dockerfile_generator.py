@@ -1,9 +1,12 @@
 """
 Dockerfile generator for DataSentinel.
 
-Generates Dockerfile and .dockerignore for containerized deployment.
+Generates Dockerfile and .dockerignore for containerized deployment, plus
+copies the static runtime files (exceptions.py, retry_handler.py,
+requirements.txt) that the generated app needs to be self-contained.
 """
 
+import shutil
 from datetime import datetime
 from pathlib import Path
 from typing import Any, Dict, List, Optional
@@ -12,6 +15,8 @@ from jinja2 import Environment, FileSystemLoader
 from loguru import logger
 
 from schemas.api_schema import APISchema
+
+RUNTIME_FILES = ("exceptions.py", "retry_handler.py", "requirements.txt")
 
 
 class DockerfileGenerator:
@@ -43,17 +48,18 @@ class DockerfileGenerator:
         self.api_schema = api_schema
         self.output_dir = Path(output_dir)
         self.output_dir.mkdir(parents=True, exist_ok=True)
-        
+
         # Setup Jinja2 environment
         if template_dir is None:
             template_dir = Path(__file__).parent.parent / "templates"
-        
+        self.template_dir = Path(template_dir)
+
         self.env = Environment(
             loader=FileSystemLoader(str(template_dir)),
             trim_blocks=True,
             lstrip_blocks=True,
         )
-        
+
         logger.info(f"Initialized DockerfileGenerator for {api_schema.title}")
     
     def _prepare_template_context(self) -> Dict[str, Any]:
@@ -134,22 +140,54 @@ class DockerfileGenerator:
             logger.error(f"Failed to generate .dockerignore: {e}")
             raise
     
+    def _copy_runtime_files(self) -> Dict[str, Path]:
+        """
+        Copy static runtime files from templates/runtime/ to output_dir.
+
+        These files (exceptions.py, retry_handler.py, requirements.txt) are
+        required by the generated app to run standalone — without depending
+        on the DataSentinel project source tree.
+
+        Returns:
+            Dictionary mapping filename to destination path.
+
+        Raises:
+            FileNotFoundError: If a runtime file is missing from templates/runtime/.
+        """
+        runtime_src = self.template_dir / "runtime"
+        copied: Dict[str, Path] = {}
+
+        for filename in RUNTIME_FILES:
+            src = runtime_src / filename
+            if not src.is_file():
+                raise FileNotFoundError(
+                    f"Required runtime template missing: {src}"
+                )
+            dst = self.output_dir / filename
+            shutil.copyfile(src, dst)
+            logger.success(f"Copied runtime file {filename} to {dst}")
+            copied[filename] = dst
+
+        return copied
+
     def generate(self) -> Dict[str, Path]:
         """
-        Generate both Dockerfile and .dockerignore.
-        
+        Generate Dockerfile, .dockerignore, and copy runtime files.
+
         Returns:
             Dictionary with paths to generated files
-        
+
         Raises:
             Exception: If generation fails
         """
         dockerfile = self.generate_dockerfile()
         dockerignore = self.generate_dockerignore()
-        
+        runtime = self._copy_runtime_files()
+
         return {
             "dockerfile": dockerfile,
             "dockerignore": dockerignore,
+            **runtime,
         }
     
     def get_generation_stats(self) -> Dict[str, Any]:
