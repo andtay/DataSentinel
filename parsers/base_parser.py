@@ -11,6 +11,7 @@ from typing import Any
 
 from loguru import logger
 
+from core.auth_manager import AuthHandler
 from core.exceptions import ParserError
 from schemas import APISchema, Endpoint, ModelSchema
 
@@ -18,25 +19,29 @@ from schemas import APISchema, Endpoint, ModelSchema
 class BaseParser(ABC):
     """
     Abstract base class for all API specification parsers.
-    
+
     All parsers (OpenAPI, GraphQL, JSON) must implement this interface
     to ensure they produce consistent APISchema output.
-    
+
     Contract:
     1. Accept source (file path or URL) in __init__
     2. Implement async parse() returning APISchema
     3. Handle errors gracefully with ParserError
     4. Provide helper methods for common operations
     """
-    
-    def __init__(self, source: str | Path):
+
+    def __init__(self, source: str | Path, auth_handler: AuthHandler | None = None):
         """
         Initialize parser with source.
-        
+
         Args:
             source: File path or URL to API specification
+            auth_handler: Optional authentication handler used by parsers that
+                fetch the spec over HTTP (e.g. GraphQL introspection). Parsers
+                that read from local files can ignore it.
         """
         self.source = str(source)
+        self.auth_handler = auth_handler
         logger.debug(f"Initialized {self.__class__.__name__} with source: {self.source}")
     
     @abstractmethod

@@ -39,14 +39,15 @@ class OpenAPIParser(BaseParser):
     - Authentication configuration
     """
     
-    def __init__(self, source: str | Path):
+    def __init__(self, source: str | Path, auth_handler=None):
         """
         Initialize OpenAPI parser.
-        
+
         Args:
             source: Path to OpenAPI file or URL to specification
+            auth_handler: Optional AuthHandler (forwarded to BaseParser).
         """
-        super().__init__(source)
+        super().__init__(source, auth_handler=auth_handler)
         self.spec: dict[str, Any] = {}
         self.openapi_version: str = ""
     

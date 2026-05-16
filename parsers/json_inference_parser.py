@@ -36,14 +36,15 @@ class JSONInferenceParser(BaseParser):
     - Optional vs required fields (with multiple samples)
     """
     
-    def __init__(self, source: str | Path):
+    def __init__(self, source: str | Path, auth_handler=None):
         """
         Initialize JSON inference parser.
-        
+
         Args:
             source: Path to JSON file or REST endpoint URL
+            auth_handler: Optional AuthHandler (forwarded to BaseParser).
         """
-        super().__init__(source)
+        super().__init__(source, auth_handler=auth_handler)
         self.infer_patterns = True  # Detect patterns in strings
     
     async def parse(self) -> APISchema:

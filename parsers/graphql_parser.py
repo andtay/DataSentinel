@@ -135,14 +135,17 @@ class GraphQLParser(BaseParser):
     - Handles nested types and custom scalars
     """
     
-    def __init__(self, source: str | Path):
+    def __init__(self, source: str | Path, auth_handler=None):
         """
         Initialize GraphQL parser.
-        
+
         Args:
             source: GraphQL endpoint URL
+            auth_handler: Optional AuthHandler used to authenticate the
+                introspection request (e.g. Bearer or X-API-Key). Endpoints
+                like Bitquery require this; public ones (Rick & Morty) do not.
         """
-        super().__init__(source)
+        super().__init__(source, auth_handler=auth_handler)
         self.schema_data: dict[str, Any] = {}
         self.type_map: dict[str, dict[str, Any]] = {}
     
@@ -228,8 +231,8 @@ class GraphQLParser(BaseParser):
             parsed = urlparse(self.source)
             path = parsed.path or "/"
             
-            # Execute introspection query
-            async with SimpleProvider(base_url) as provider:
+            # Execute introspection query (auth header injected by the handler)
+            async with SimpleProvider(base_url, auth_handler=self.auth_handler) as provider:
                 response = await provider.fetch(
                     path,
                     method="POST",

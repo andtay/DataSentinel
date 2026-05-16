@@ -34,6 +34,7 @@ from loguru import logger
 
 from config.settings import Settings
 from config.logging_config import setup_logging
+from core.auth_manager import AuthHandler, APIKeyAuth, BearerAuth
 from core.exceptions import (
     DataSentinelError,
     ConfigurationError,
@@ -246,8 +247,37 @@ class AutoSentinel:
         if not parser_class:
             raise ConfigurationError(f"Unknown format type: {format_type}")
 
-        # Parsers take source in __init__
-        return parser_class(self.args.api)
+        return parser_class(self.args.api, auth_handler=self._build_auth_handler())
+
+    def _build_auth_handler(self) -> AuthHandler | None:
+        """
+        Construct an AuthHandler from the CLI auth flags.
+
+        Returns:
+            AuthHandler for bearer/api-key, or None when no auth is requested
+            (the provider then falls back to NoAuth).
+
+        Raises:
+            ConfigurationError: For auth types whose wiring isn't implemented
+                yet (oauth2, basic) — those need extra CLI args this command
+                does not expose.
+        """
+        auth_type = (self.args.auth_type or "none").lower()
+
+        if auth_type == "none":
+            return None
+
+        if auth_type == "bearer":
+            return BearerAuth(token=self.args.auth_token)
+
+        if auth_type == "api-key":
+            header_name = self.args.auth_header or "X-API-Key"
+            return APIKeyAuth(api_key=self.args.auth_token, header_name=header_name)
+
+        raise ConfigurationError(
+            f"Auth type '{auth_type}' is not wired to the parser yet. "
+            f"Supported: none, bearer, api-key."
+        )
 
     async def _run_generators(self, api_schema: APISchema):
         """
