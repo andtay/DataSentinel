@@ -304,7 +304,8 @@ class GraphQLParser(BaseParser):
                 endpoints.append(endpoint)
         
         # Extract mutations
-        mutation_type_name = spec.get("mutationType", {}).get("name")
+        mutation_type = spec.get("mutationType")
+        mutation_type_name = mutation_type.get("name") if mutation_type else None
         if mutation_type_name and mutation_type_name in self.type_map:
             mutation_type = self.type_map[mutation_type_name]
             for field in mutation_type.get("fields", []):

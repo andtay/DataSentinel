@@ -75,6 +75,9 @@ class JSONInferenceParser(BaseParser):
         # Infer model from JSON structure
         inferred_model = self._infer_model_from_json(json_data, "InferredModel")
         
+        # Collect all models (including nested ones)
+        all_models = self._collect_all_models(inferred_model, json_data)
+        
         # Create endpoint
         endpoint = Endpoint(
             path="/data",
@@ -83,7 +86,7 @@ class JSONInferenceParser(BaseParser):
             description="Auto-generated from JSON sample",
             operation_id="get_data",
             request_model=None,
-            response_model=inferred_model,
+            response_model=inferred_model,  # Keep as ModelSchema object
             auth_required=False,
             deprecated=False
         )
@@ -95,7 +98,7 @@ class JSONInferenceParser(BaseParser):
             base_url=base_url,
             description="Auto-generated schema from JSON inference",
             endpoints=[endpoint],
-            models={inferred_model.name: inferred_model},
+            models=all_models,
             auth_config=None
         )
         
@@ -270,6 +273,42 @@ class JSONInferenceParser(BaseParser):
         # Add example
         field.example = value
         
+        return field
+    
+    def _collect_all_models(self, root_model: ModelSchema, json_data: Any) -> dict[str, ModelSchema]:
+        """
+        Collect all models including nested ones.
+        
+        Args:
+            root_model: The root model
+            json_data: Original JSON data
+            
+        Returns:
+            Dictionary of all models
+        """
+        models = {root_model.name: root_model}
+        
+        # Recursively collect nested models
+        def collect_nested(model: ModelSchema, data: Any):
+            for field in model.fields:
+                if field.nested_model:
+                    # Find the corresponding data
+                    field_data = None
+                    if isinstance(data, dict) and field.name in data:
+                        field_data = data[field.name]
+                        
+                        # Handle arrays
+                        if field.type == FieldType.ARRAY and isinstance(field_data, list) and len(field_data) > 0:
+                            field_data = field_data[0]
+                        
+                        # Create nested model if not already exists
+                        if field.nested_model not in models and field_data:
+                            nested_model = self._infer_model_from_json(field_data, field.nested_model)
+                            models[nested_model.name] = nested_model
+                            collect_nested(nested_model, field_data)
+        
+        collect_nested(root_model, json_data)
+        return models
         return field
     
     def _infer_field_type(self, value: Any) -> FieldType:

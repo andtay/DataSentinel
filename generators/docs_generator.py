@@ -59,7 +59,7 @@ class DocsGenerator:
         )
         
         # Register custom filters and globals
-        self.env.filters["tojson"] = lambda x: json.dumps(x, indent=2)
+        self.env.filters["tojson"] = lambda x, **kwargs: json.dumps(x, **kwargs)
         self.env.globals["_get_endpoint_anchor"] = self._get_endpoint_anchor
         self.env.globals["_count_total_fields"] = self._count_total_fields
         self.env.globals["_get_field_type_display"] = self._get_field_type_display

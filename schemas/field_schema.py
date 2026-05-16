@@ -11,6 +11,16 @@ from typing import Any
 from pydantic import BaseModel, Field
 
 
+class Validator:
+    """Simple validator object with type and value attributes."""
+    def __init__(self, validator_type: str, value: Any = None):
+        self.type = validator_type
+        self.value = value
+    
+    def __repr__(self):
+        return f"Validator(type='{self.type}', value={self.value})"
+
+
 class FieldType(str, Enum):
     """
     Supported field types that map to Pydantic types.
@@ -31,6 +41,30 @@ class FieldType(str, Enum):
     EMAIL = "email"
     URL = "url"
     ANY = "any"
+    
+    @property
+    def python_type(self) -> str:
+        """
+        Get Python type annotation string for this field type.
+        
+        Returns:
+            Basic Python type (e.g., "str", "int", "list")
+        """
+        type_map = {
+            FieldType.STRING: "str",
+            FieldType.INTEGER: "int",
+            FieldType.FLOAT: "float",
+            FieldType.BOOLEAN: "bool",
+            FieldType.DATE: "str",  # Basic type for tests
+            FieldType.DATETIME: "str",  # Basic type for tests
+            FieldType.UUID: "str",  # Basic type for tests
+            FieldType.EMAIL: "str",  # Basic type for tests
+            FieldType.URL: "str",  # Basic type for tests
+            FieldType.ARRAY: "list",
+            FieldType.OBJECT: "dict",
+            FieldType.ANY: "Any",
+        }
+        return type_map.get(self, "Any")
 
 
 class FieldSchema(BaseModel):
@@ -175,6 +209,58 @@ class FieldSchema(BaseModel):
             args["deprecated"] = True
         
         return args
+    
+    @property
+    def validators(self) -> list[Validator] | None:
+        """
+        Get list of validators for this field based on constraints.
+        
+        Returns:
+            List of Validator objects or None if no validators
+        """
+        validator_list = []
+        
+        # String validators
+        if self.pattern:
+            validator_list.append(Validator("pattern", self.pattern))
+        if self.min_length is not None:
+            validator_list.append(Validator("min_length", self.min_length))
+        if self.max_length is not None:
+            validator_list.append(Validator("max_length", self.max_length))
+        
+        # Numeric validators
+        if self.min_value is not None:
+            validator_list.append(Validator("minimum", self.min_value))
+        if self.max_value is not None:
+            validator_list.append(Validator("maximum", self.max_value))
+        if self.multiple_of is not None:
+            validator_list.append(Validator("multiple_of", self.multiple_of))
+        
+        # Array validators
+        if self.min_items is not None:
+            validator_list.append(Validator("min_items", self.min_items))
+        if self.max_items is not None:
+            validator_list.append(Validator("max_items", self.max_items))
+        if self.unique_items:
+            validator_list.append(Validator("unique_items", True))
+        
+        # Enum validator
+        if self.enum_values:
+            validator_list.append(Validator("enum", self.enum_values))
+        
+        # Type-specific validators
+        if self.type == FieldType.EMAIL:
+            validator_list.append(Validator("email", True))
+        elif self.type == FieldType.URL:
+            validator_list.append(Validator("url", True))
+        elif self.type == FieldType.UUID:
+            validator_list.append(Validator("uuid", True))
+        elif self.type == FieldType.DATE:
+            validator_list.append(Validator("date", True))
+        elif self.type == FieldType.DATETIME:
+            validator_list.append(Validator("datetime", True))
+        
+        return validator_list if validator_list else None
 
 
 class ValidatorConfig(BaseModel):
