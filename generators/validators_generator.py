@@ -143,7 +143,104 @@ class ValidatorsGenerator:
             List of model class names
         """
         return list(self.api_schema.models.keys())
-    
+
+    def _is_graphql(self) -> bool:
+        return getattr(self.api_schema, "protocol", "rest") == "graphql"
+
+    def _param_graphql_format(self, param: Parameter) -> str:
+        field_type = param.field_schema.type
+        if field_type in (FieldType.INTEGER, FieldType.FLOAT):
+            return "literal"
+        if field_type == FieldType.BOOLEAN:
+            return "bool"
+        if field_type in (FieldType.OBJECT, FieldType.ARRAY):
+            return "json"
+        return "string"
+
+    def _build_graphql_selection(
+        self,
+        model_name: str,
+        depth: int = 2,
+        visited: Optional[set[str]] = None,
+    ) -> str:
+        if depth <= 0 or model_name not in self.api_schema.models:
+            return ""
+        if visited is None:
+            visited = set()
+        if model_name in visited:
+            return ""
+        visited = visited | {model_name}
+
+        model = self.api_schema.models[model_name]
+        parts: List[str] = []
+        for field in model.fields:
+            if field.type == FieldType.OBJECT and field.nested_model:
+                nested = self._build_graphql_selection(
+                    field.nested_model, depth - 1, visited
+                )
+                parts.append(
+                    f"{field.name} {{ {nested} }}"
+                    if nested
+                    else f"{field.name} {{ id }}"
+                )
+            elif field.type == FieldType.ARRAY:
+                if field.nested_model:
+                    nested = self._build_graphql_selection(
+                        field.nested_model, depth - 1, visited
+                    )
+                    parts.append(
+                        f"{field.name} {{ {nested} }}"
+                        if nested
+                        else f"{field.name} {{ id }}"
+                    )
+                else:
+                    # Object lists are sometimes modeled as scalar arrays
+                    parts.append(f"{field.name} {{ id }}")
+            elif field.name in ("residents", "characters") and field.type == FieldType.ARRAY:
+                continue
+            else:
+                parts.append(field.name)
+        return " ".join(parts)
+
+    def _build_graphql_operations(self) -> List[Dict[str, Any]]:
+        operations: List[Dict[str, Any]] = []
+        for endpoint in self.api_schema.endpoints:
+            operation_name = endpoint.operation_id or endpoint.summary or "unknown"
+            operation_type = (
+                "mutation" if "mutation" in endpoint.tags else "query"
+            )
+            response_model = self._get_response_model_name(endpoint)
+            selection = (
+                self._build_graphql_selection(response_model)
+                if response_model != "Any"
+                else "id"
+            )
+            if not selection:
+                selection = "id"
+
+            parameters = []
+            for param in endpoint.parameters:
+                parameters.append(
+                    {
+                        "name": param.name,
+                        "required": param.required,
+                        "type_annotation": self._get_param_type_annotation(param),
+                        "graphql_format": self._param_graphql_format(param),
+                    }
+                )
+
+            operations.append(
+                {
+                    "function_name": endpoint.get_function_name(),
+                    "operation_name": operation_name,
+                    "operation_type": operation_type,
+                    "selection": selection,
+                    "response_model": response_model,
+                    "parameters": parameters,
+                }
+            )
+        return operations
+
     def _prepare_template_context(self) -> Dict[str, Any]:
         """
         Prepare context data for Jinja2 template.
@@ -151,11 +248,15 @@ class ValidatorsGenerator:
         Returns:
             Template context dictionary
         """
-        return {
+        context: Dict[str, Any] = {
             "api_schema": self.api_schema,
             "model_names": self._get_model_names(),
             "generation_timestamp": datetime.utcnow().isoformat() + "Z",
         }
+        if self._is_graphql():
+            context["graphql_path"] = self.api_schema.graphql_path or "/graphql"
+            context["graphql_operations"] = self._build_graphql_operations()
+        return context
     
     def generate(self) -> Path:
         """
@@ -170,12 +271,16 @@ class ValidatorsGenerator:
         logger.info("Generating validators.py...")
         
         try:
-            # Load template
-            template = self.env.get_template("validators.py.jinja2")
-            
-            # Prepare context
+            is_graphql = self._is_graphql()
+            template_name = (
+                "graphql_validators.py.jinja2"
+                if is_graphql
+                else "validators.py.jinja2"
+            )
+            template = self.env.get_template(template_name)
+
             context = self._prepare_template_context()
-            
+
             # Render template
             content = template.render(**context)
             

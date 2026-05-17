@@ -232,6 +232,15 @@ class APISchema(BaseModel):
     )
     
     auth_config: AuthConfig | None = Field(None, description="Authentication configuration")
+
+    protocol: str = Field(
+        default="rest",
+        description="API protocol: rest or graphql",
+    )
+    graphql_path: str | None = Field(
+        default=None,
+        description="GraphQL HTTP path (e.g. /graphql) when protocol is graphql",
+    )
     
     model_config = {
         "json_schema_extra": {

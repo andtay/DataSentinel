@@ -7,6 +7,7 @@ to extract schema information from GraphQL APIs.
 
 from pathlib import Path
 from typing import Any
+from urllib.parse import urlparse
 
 from loguru import logger
 
@@ -178,7 +179,9 @@ class GraphQLParser(BaseParser):
         title = self._extract_title()
         version = "1.0.0"  # GraphQL doesn't have version in schema
         description = "GraphQL API"
-        base_url = str(self.source)
+        parsed = urlparse(str(self.source))
+        base_url = f"{parsed.scheme}://{parsed.netloc}"
+        graphql_path = parsed.path if parsed.path and parsed.path != "/" else "/graphql"
         
         # Extract endpoints (queries and mutations)
         endpoints = self.extract_endpoints(self.schema_data)
@@ -197,7 +200,9 @@ class GraphQLParser(BaseParser):
             description=description,
             endpoints=endpoints,
             models=models,
-            auth_config=None  # GraphQL auth is typically handled via headers
+            auth_config=None,  # GraphQL auth is typically handled via headers
+            protocol="graphql",
+            graphql_path=graphql_path,
         )
         
         # Validate

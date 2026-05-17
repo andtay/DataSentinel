@@ -438,4 +438,37 @@ def test_tests_generator_query_parameters(temp_output_dir):
     # Should have parameter test
     assert "async def test_search_users_with_parameters(" in content
 
+
+def test_tests_generator_skips_phantom_response_models(temp_output_dir):
+    """Endpoints must not reference factories for models missing from models.py."""
+    list_model = ModelSchema(
+        name="Locations",
+        fields=[
+            FieldSchema(name="info", type=FieldType.OBJECT, required=False),
+        ],
+        description="Phantom list response not in models dict",
+    )
+    endpoint = Endpoint(
+        path="/query/locations",
+        method="GET",
+        operation_id="locations",
+        response_model=list_model,
+        parameters=[],
+    )
+    api_schema = APISchema(
+        title="Query API",
+        version="1.0.0",
+        base_url="https://rickandmortyapi.com",
+        endpoints=[endpoint],
+        models={"Character": ModelSchema(name="Character", fields=[])},
+    )
+
+    generator = TestsGenerator(api_schema, temp_output_dir)
+    output_file = generator.generate()
+    content = output_file.read_text(encoding="utf-8")
+
+    assert "LocationsFactory" not in content
+    assert "isinstance(result, Locations)" not in content
+    assert "async def test_locations_success(" in content
+
 # Made with Bob

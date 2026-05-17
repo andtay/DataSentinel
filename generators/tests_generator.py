@@ -69,28 +69,40 @@ class TestsGenerator:
     def _get_response_model_name(self, endpoint: Endpoint) -> str:
         """
         Get the response model name for an endpoint.
-        
+
+        Only returns names that exist in api_schema.models so generated
+        tests reference real ModelFactory classes and imports.
+
         Args:
             endpoint: Endpoint schema
-        
+
         Returns:
             Model class name or "Any" if no model
         """
-        if endpoint.response_model:
+        if (
+            endpoint.response_model
+            and endpoint.response_model.name in self.api_schema.models
+        ):
             return endpoint.response_model.name
         return "Any"
-    
+
     def _get_response_model(self, endpoint: Endpoint) -> Optional[str]:
         """
         Get the response model for an endpoint (for validation).
-        
+
+        Returns None when the endpoint references a model that was not
+        materialized in models.py (e.g. phantom \"Locations\" from GraphQL).
+
         Args:
             endpoint: Endpoint schema
-        
+
         Returns:
             Model name or None
         """
-        if endpoint.response_model:
+        if (
+            endpoint.response_model
+            and endpoint.response_model.name in self.api_schema.models
+        ):
             return endpoint.response_model.name
         return None
     

@@ -1,0 +1,286 @@
+"""
+Auto-generated GraphQL API validators for {{ api_schema.title }}.
+
+Generated: {{ generation_timestamp }}
+API Version: {{ api_schema.version }}
+"""
+
+from typing import Any, Dict, List, Optional, Union
+import json
+import httpx
+from loguru import logger
+from pydantic import ValidationError
+
+from models import {{ model_names|join(', ') }}
+from exceptions import (
+    ValidationException,
+    APIException,
+    SchemaException,
+)
+from retry_handler import with_retry
+
+
+class APIValidator:
+    """
+    Validates GraphQL API responses against Pydantic models.
+
+    All operations POST to {{ graphql_path }} with a GraphQL query body.
+    """
+
+    def __init__(
+        self,
+        base_url: str,
+        timeout: float = 30.0,
+        max_retries: int = 3,
+        enable_cache: bool = False,
+    ):
+        self.base_url = base_url.rstrip("/")
+        self.graphql_path = "{{ graphql_path }}"
+        self.timeout = timeout
+        self.max_retries = max_retries
+        self.enable_cache = enable_cache
+        self._cache: Dict[str, Any] = {}
+        self._client: Optional[httpx.AsyncClient] = None
+
+        logger.info(
+            f"Initialized GraphQL APIValidator for {base_url}{self.graphql_path} "
+            f"(timeout={timeout}s, max_retries={max_retries})"
+        )
+
+    async def __aenter__(self):
+        self._client = httpx.AsyncClient(
+            base_url=self.base_url,
+            timeout=self.timeout,
+        )
+        return self
+
+    async def __aexit__(self, exc_type, exc_val, exc_tb):
+        if self._client:
+            await self._client.aclose()
+
+    def _get_cache_key(self, query: str) -> str:
+        return query
+
+    def _check_cache(self, cache_key: str) -> Optional[Any]:
+        if self.enable_cache and cache_key in self._cache:
+            return self._cache[cache_key]
+        return None
+
+    def _update_cache(self, cache_key: str, data: Any) -> None:
+        if self.enable_cache:
+            self._cache[cache_key] = data
+
+    def _detect_schema_drift(
+        self,
+        expected_fields: set,
+        actual_fields: set,
+    ) -> Dict[str, List[str]]:
+        missing = expected_fields - actual_fields
+        extra = actual_fields - expected_fields
+        drift: Dict[str, List[str]] = {}
+        if missing:
+            drift["missing"] = sorted(missing)
+        if extra:
+            drift["extra"] = sorted(extra)
+        return drift
+
+    @with_retry(max_attempts=3, base_delay=1.0)
+    async def _make_request(
+        self,
+        method: str,
+        endpoint: str,
+        **kwargs,
+    ) -> httpx.Response:
+        if not self._client:
+            raise APIException("Client not initialized. Use async context manager.")
+
+        try:
+            response = await self._client.request(method, endpoint, **kwargs)
+            response.raise_for_status()
+            return response
+        except httpx.HTTPStatusError as e:
+            logger.error(f"HTTP error {e.response.status_code} for {endpoint}")
+            raise APIException(
+                f"HTTP {e.response.status_code}: {e.response.text}",
+                status_code=e.response.status_code,
+            )
+        except httpx.RequestError as e:
+            logger.error(f"Request error for {endpoint}: {e}")
+            raise APIException(f"Request failed: {str(e)}")
+
+    def _coerce_list_ids(self, value: Any) -> Any:
+        """Coerce GraphQL object lists to ID strings when models expect scalars."""
+        if not isinstance(value, list):
+            return value
+        coerced = []
+        for item in value:
+            if isinstance(item, dict) and "id" in item:
+                coerced.append(str(item["id"]))
+            else:
+                coerced.append(item)
+        return coerced
+
+    def _coerce_payload(self, payload: Any) -> Any:
+        """Normalize common GraphQL list shapes before Pydantic validation."""
+        if not isinstance(payload, dict):
+            return payload
+        data = dict(payload)
+        for key in ("episode", "episodes", "characters", "residents"):
+            if key in data:
+                data[key] = self._coerce_list_ids(data[key])
+        for loc_key in ("origin", "location"):
+            if isinstance(data.get(loc_key), dict):
+                nested = dict(data[loc_key])
+                if "residents" in nested:
+                    nested["residents"] = self._coerce_list_ids(nested["residents"])
+                data[loc_key] = nested
+        if isinstance(data.get("results"), list):
+            data["results"] = [
+                self._coerce_payload(item) if isinstance(item, dict) else item
+                for item in data["results"]
+            ]
+        return data
+
+    async def _execute_graphql(
+        self,
+        operation_type: str,
+        operation_name: str,
+        selection: str,
+        args_clause: str,
+    ) -> Dict[str, Any]:
+        """Execute a GraphQL operation and return the data payload."""
+        keyword = "mutation" if operation_type == "mutation" else "query"
+        query = (
+            keyword
+            + " { "
+            + operation_name
+            + args_clause
+            + " { "
+            + selection
+            + " } }"
+        )
+
+        cache_key = self._get_cache_key(query)
+        cached = self._check_cache(cache_key)
+        if cached is not None:
+            return cached
+
+        logger.info(f"GraphQL {keyword} {operation_name}{args_clause}")
+        response = await self._make_request(
+            "POST",
+            self.graphql_path,
+            json={"query": query},
+        )
+
+        try:
+            body = response.json()
+        except Exception as e:
+            raise ValidationException(f"Invalid JSON response: {str(e)}")
+
+        if body.get("errors"):
+            messages = [err.get("message", str(err)) for err in body["errors"]]
+            raise APIException(f"GraphQL errors: {'; '.join(messages)}")
+
+        data = body.get("data") or {}
+        payload = data.get(operation_name)
+        if payload is None:
+            raise ValidationException(
+                f"GraphQL response missing '{operation_name}' in data"
+            )
+
+        self._update_cache(cache_key, payload)
+        return payload
+
+{% for gql in graphql_operations %}
+    async def validate_{{ gql.function_name }}(
+        self,
+        {% for param in gql.parameters %}
+        {{ param.name }}: {{ param.type_annotation }}{% if not param.required %} = None{% endif %},
+        {% endfor %}
+    ) -> {{ gql.response_model }}:
+        """
+        Validate GraphQL {{ gql.operation_type }} {{ gql.operation_name }}.
+        """
+        arg_parts: List[str] = []
+        {% for param in gql.parameters %}
+        if {{ param.name }} is not None:
+            {% if param.graphql_format == "literal" %}
+            arg_parts.append("{{ param.name }}: " + str({{ param.name }}))
+            {% elif param.graphql_format == "bool" %}
+            arg_parts.append("{{ param.name }}: " + str({{ param.name }}).lower())
+            {% elif param.graphql_format == "json" %}
+            arg_parts.append("{{ param.name }}: " + json.dumps({{ param.name }}))
+            {% else %}
+            arg_parts.append('{{ param.name }}: "' + str({{ param.name }}) + '"')
+            {% endif %}
+        {% endfor %}
+        args_clause = f"({', '.join(arg_parts)})" if arg_parts else ""
+
+        payload = await self._execute_graphql(
+            operation_type="{{ gql.operation_type }}",
+            operation_name="{{ gql.operation_name }}",
+            selection="{{ gql.selection }}",
+            args_clause=args_clause,
+        )
+
+        {% if gql.response_model != "Any" %}
+        expected_fields = set({{ gql.response_model }}.model_fields.keys())
+        actual_fields = set(payload.keys()) if isinstance(payload, dict) else set()
+        drift = self._detect_schema_drift(expected_fields, actual_fields)
+        if drift:
+            logger.warning(f"Schema drift for {{ gql.operation_name }}: {drift}")
+
+        try:
+            return {{ gql.response_model }}.model_validate(
+                self._coerce_payload(payload)
+            )
+        except ValidationError as e:
+            raise ValidationException(
+                f"Response validation failed: {e.error_count()} errors",
+                errors=e.errors(),
+            )
+        {% else %}
+        return payload
+        {% endif %}
+
+{% endfor %}
+
+
+class ValidationReport:
+    """Generates validation reports for API endpoints."""
+
+    def __init__(self):
+        self.results: List[Dict[str, Any]] = []
+
+    def add_result(
+        self,
+        endpoint: str,
+        success: bool,
+        error: Optional[str] = None,
+        drift: Optional[Dict] = None,
+    ) -> None:
+        self.results.append({
+            "endpoint": endpoint,
+            "success": success,
+            "error": error,
+            "drift": drift,
+        })
+
+    def get_summary(self) -> Dict[str, Any]:
+        total = len(self.results)
+        successful = sum(1 for r in self.results if r["success"])
+        failed = total - successful
+        drift_detected = sum(1 for r in self.results if r.get("drift"))
+        return {
+            "total": total,
+            "successful": successful,
+            "failed": failed,
+            "drift_detected": drift_detected,
+            "success_rate": (successful / total * 100) if total > 0 else 0,
+        }
+
+    def get_failed_endpoints(self) -> List[Dict[str, Any]]:
+        return [r for r in self.results if not r["success"]]
+
+    def get_drift_endpoints(self) -> List[Dict[str, Any]]:
+        return [r for r in self.results if r.get("drift")]
