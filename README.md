@@ -283,30 +283,13 @@ pytest tests/integration/test_json_flow.py -v
 ### Build and Run
 
 ```bash
-cd generated/
-docker build -t my-validator .
-docker run -p 8000:8000 my-validator
+rm -rf generated
+python auto_sentinel.py --api https://rickandmortyapi.com/graphql --format graphql
+cd generated
+docker build -t rickmorty-validator:1.0.0 .
+docker run -d -p 8765:8000 rickmorty-validator:1.0.0
 ```
 
-### Docker Compose
-
-```yaml
-version: '3.8'
-services:
-  validator:
-    build: .
-    ports:
-      - "8000:8000"
-    environment:
-      - LOG_LEVEL=INFO
-    restart: unless-stopped
-```
-
-```bash
-docker-compose up -d
-```
-
----
 
 ## ☁️ Cloud Deployment
 
